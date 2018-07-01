@@ -56,10 +56,15 @@ public:
 	TradeState() {
 		wins = 0;
 		losses = 0;
+		print_trade_candles = false;
 
 		for(string stock: constants::kNifty50) {
 			trade_map.insert(std::make_pair(stock, OngoingTrade(stock)));
 		}
+	}
+
+	void SetPrintTradeCandles() {
+		print_trade_candles = true;
 	}
 
 	double BuyIfFitsCriteria(const StockCandle& candle, double capital, const BacktestCriteria& criteria) {
@@ -164,8 +169,11 @@ public:
 
 private:
 	double Sell(double capital, double sell_price, const StockCandle& candle) {
+		if(print_trade_candles) {
+			std::cout << "Sold candle: " << candle;
+		}
+
 		auto it = trade_map.find(candle.symbol);
-		//std::cout << "Sold candle: " << candle;
 		capital += it->second.stocks_held*sell_price;
 		it->second.trade_ongoing = false;
 		it->second.stocks_held = 0;
@@ -195,7 +203,10 @@ private:
 	 * returns double: capital left after the trade.
 	 */
 	double Buy(const StockCandle& candle, double capital, const BacktestCriteria& criteria) {
-		//std::cout << "Bought candle: " << candle;
+		if(print_trade_candles) {
+			std::cout << "Bought candle: " << candle;
+		}
+
 		auto it = trade_map.find(candle.symbol);
 
 		/* Setting the buy price. */
@@ -231,6 +242,7 @@ private:
 
 	std::map<string, OngoingTrade> trade_map;
 	double wins, losses;
+	bool print_trade_candles;
 };
 
 }
