@@ -13,6 +13,15 @@ using namespace std;
 
 typedef std::pair<tm, std::vector< ::finance::StockCandle> > StockCandlesForTimestamp;
 
+double GetCagr(tm start_time_struct, tm end_time_struct, 
+	double initial_capital, double final_capital) {
+	time_t start_time = mktime(&start_time_struct);
+	time_t end_time = mktime(&end_time_struct);
+
+	double years = ((double) end_time - start_time)/(60*60*24*365);
+	return (pow((final_capital/initial_capital), (1.0/years)) - 1)*100;
+}
+
 double Backtest(const vector<StockCandlesForTimestamp>& merged_candles, 
 	const string& start_time_string, const string& date_time_format, 
 	double capital, ::finance::BacktestCriteria criteria) {
@@ -37,12 +46,6 @@ double Backtest(const vector<StockCandlesForTimestamp>& merged_candles,
 
 	::finance::TradeState state;
 	while(index >= 0) {
-		// tm current_time_struct = merged_candles[index].first;
-		// time_t current_time = mktime(&current_time_struct);
-		// if(current_time > end_time) {
-		// 	break;
-		// }
-
 		for(const ::finance::StockCandle& candle: merged_candles[index].second) {
 			capital = state.SellIfFitsCriteria(candle, capital, criteria);
 			capital = state.BuyIfFitsCriteria(candle, capital, criteria);
@@ -51,15 +54,13 @@ double Backtest(const vector<StockCandlesForTimestamp>& merged_candles,
 		index--;
 	}
 
-	//std::cout << "State: " << state << endl;
 	capital = state.GetFinalCapital(capital);
-	double cagr = (pow((capital/initial_capital), (1.0/10)) - 1)*100;
 	std::cout << "Exit gain: " << criteria.exit_gain_criteria.gain_percentage 
-		<< " Final capital: " << ((long long) capital) << " Wins: " << state.GetWins() 
-		<< " Losses: " << state.GetLosses() << " CAGR: " << cagr << endl;
-	//std::cout << ((long long) capital) << endl;
-	//std::cout << state.GetWins() << endl;
-	//std::cout << state.GetLosses() << endl;
+		<< " Final capital: " << ((long long) capital) 
+		<< " Wins: " << state.GetWins() 
+		<< " Losses: " << state.GetLosses() 
+		<< " CAGR: " << GetCagr(start_time_struct, merged_candles[0].first, 
+			initial_capital, capital) << endl;
 	return capital;
 }
 
@@ -149,7 +150,7 @@ int main() {
 
 	/* Setting the risk criteria. */
 	criteria.risk_criteria.enabled = false;
-	criteria.risk_criteria.risk_percentage = 0.075;
+	criteria.risk_criteria.risk_percentage = 0.04;
 
 	std::vector<std::vector< ::finance::StockCandle> > multiple_stock_candles;
 	for(string stock: ::finance::constants::kNifty50) {
@@ -161,9 +162,8 @@ int main() {
 	
 	for(int i=4; i <= 20; i++) {
 		criteria.exit_gain_criteria.gain_percentage = ((double)i)/100;
-		double final_capital = Backtest(MergeStockCandles(multiple_stock_candles), "6/20/2008 15:30:00", 
+		Backtest(MergeStockCandles(multiple_stock_candles), "6/22/2008 15:30:00", 
 			::finance::kGoogleFinanceDateTimeFormat, 100000, criteria);
-		//std::cout << "Gain perc: " << i << " Final Capital: " << ((long long)final_capital) << endl;
 	}
 
 	return 0;
