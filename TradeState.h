@@ -67,15 +67,38 @@ public:
 		print_trade_candles = true;
 	}
 
-	double BuyIfFitsCriteria(const StockCandle& candle, double capital, const BacktestCriteria& criteria) {
+	bool DoesFitBuyCriteria(const StockCandle& candle, const BacktestCriteria& criteria) {
 		auto it = trade_map.find(candle.symbol);
 		if(!it->second.trade_ongoing) {
 			/* Checking the volume criteria. */
 			if(criteria.buy_volume_criteria.enabled) {
 				if(candle.volume < candle.average_volume*criteria.buy_volume_criteria.average_volume_threshold) {
-					return capital;
+					return false;
 				}
 			}
+
+			/* Checking the RSI criteria. */
+			if(criteria.rsi_criteria.enabled) {
+				if(candle.rsi_computed && (candle.rsi > criteria.rsi_criteria.overbought_threshold)) {
+					return false;
+				}
+			}
+
+			/* Checking if Marubozu is enabled. */
+			if(criteria.marubozu_criteria.enabled) {
+				if(!candle.IsBullishMarubozu(criteria.marubozu_criteria)) {
+					return false;
+				}
+
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	double BuyIfFitsCriteria(const StockCandle& candle, double capital, const BacktestCriteria& criteria) {
+		if(DoesFitBuyCriteria(candle, criteria)) {
 
 			/* Checking if the capital is enough to buy. */
 			if(criteria.buy_criteria.criteria == BuyCriteria::CLOSE && (capital < candle.close)) {
@@ -89,14 +112,7 @@ public:
 				return capital;
 			}
 
-			/* Checking if Marubozu is enabled. */
-			if(criteria.marubozu_criteria.enabled) {
-				if(!candle.IsBullishMarubozu(criteria.marubozu_criteria)) {
-					return capital;
-				}
-
-				return Buy(candle, capital, criteria);
-			}
+			return Buy(candle, capital, criteria);
 		}
 
 		return capital;
@@ -106,14 +122,16 @@ public:
 		auto it = trade_map.find(candle.symbol);
 		if(it->second.trade_ongoing) {
 			if(it->second.IsStopLossBreached(candle, criteria)) {
+				return Sell(capital, it->second.stop_loss, candle);
 				if(it->second.IsExitGainHit(candle, criteria)) {
-					std::cout << "Both stop loss and exit gain hit." << endl;
-					std::cout << "Candle: " << candle << endl;
-					std::cout << "Trade State: " << *(this) << endl;
-					return Sell(capital, it->second.stop_loss, candle);
+					// std::cout << "Both stop loss and exit gain hit." << endl;
+					// std::cout << "Candle: " << candle << endl;
+					// std::cout << "Trade State: " << *(this) << endl;
+					// return Sell(capital, it->second.stop_loss, candle);
+
 					// exit(0);
 				} else {
-					return Sell(capital, it->second.stop_loss, candle);
+					//return Sell(capital, it->second.stop_loss, candle);
 				}
 			}
 
